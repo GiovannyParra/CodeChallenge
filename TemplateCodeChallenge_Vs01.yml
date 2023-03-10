@@ -66,14 +66,9 @@ Resources:
           DeviceIndex: "0"
           GroupSet:
             - !Ref MySecurityGroup
-          SubnetId: !Ref MySubnet
-          PrivateIpAddress: "10.0.0.10" # optional, you can remove this line
+          SubnetId: !Ref MyPublicSubnet
           DeleteOnTermination: true
-  MyEIPAssociation:
-    Type: AWS::EC2::EIPAssociation
-    Properties:
-      AllocationId: !GetAtt MyEIP.AllocationId
-      InstanceId: !Ref MyEC2Instance
+
 
 
 
