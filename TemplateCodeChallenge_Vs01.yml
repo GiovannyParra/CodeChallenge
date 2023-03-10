@@ -1,0 +1,79 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Create an EC2 instance with a public IP address and web server'
+Resources:
+  MyVpc:
+    Type: 'AWS::EC2::VPC'
+    Properties:
+      CidrBlock: '10.0.0.0/16'
+  MyInternetGateway:
+    Type: 'AWS::EC2::InternetGateway'
+  MyVpcGatewayAttachment:
+    Type: 'AWS::EC2::VPCGatewayAttachment'
+    Properties:
+      VpcId: !Ref MyVpc
+      InternetGatewayId: !Ref MyInternetGateway
+  MyPublicSubnet:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      VpcId: !Ref MyVpc
+      CidrBlock: '10.0.0.0/24'
+      MapPublicIpOnLaunch: true
+  MySecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      VpcId: !Ref MyVpc
+      GroupDescription: 'Allow HTTP and HTTPS traffic'
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: '0.0.0.0/0'
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: '0.0.0.0/0'
+  MyInstance:
+    Type: 'AWS::EC2::Instance'
+    Properties:
+      ImageId: ami-0c94855ba95c71c99 # Amazon Linux 2 AMI (HVM), SSD Volume Type
+      InstanceType: t2.micro
+      KeyName: MyKeyPair
+      SecurityGroupIds: [!Ref MySecurityGroup]
+      SubnetId: !Ref MyPublicSubnet
+      UserData: !Base64 |
+        #!/bin/bash
+        yum update -y
+        yum install -y httpd mod_ssl
+        systemctl start httpd.service
+        systemctl enable httpd.service
+        echo "<html><body><h1>Hello World</h1></body></html>" > /var/www/html/index.html
+        echo "<VirtualHost *:80>" > /etc/httpd/conf.d/http.conf
+        echo "  ServerName mywebserver" >> /etc/httpd/conf.d/http.conf
+        echo "  RewriteEngine On" >> /etc/httpd/conf.d/http.conf
+        echo "  RewriteRule ^(.*)$ https://%{HTTP_HOST}$1 [R=301,L]" >> /etc/httpd/conf.d/http.conf
+        echo "</VirtualHost>" >> /etc/httpd/conf.d/http.conf
+        echo "<VirtualHost *:443>" > /etc/httpd/conf.d/ssl.conf
+        echo "  ServerName mywebserver" >> /etc/httpd/conf.d/ssl.conf
+        echo "  DocumentRoot /var/www/html" >> /etc/httpd/conf.d/ssl.conf
+        echo "  SSLEngine on" >> /etc/httpd/conf.d/ssl.conf
+        echo "  SSLCertificateFile /etc/pki/tls/certs/server.crt" >> /etc/httpd/conf.d/ssl.conf
+        echo "  SSLCertificateKeyFile /etc/pki/tls/private/server.key
+              Tags:
+        - Key: Name
+          Value: "My EC2 Instance"
+      NetworkInterfaces:
+        - AssociatePublicIpAddress: true
+          DeviceIndex: "0"
+          GroupSet:
+            - !Ref MySecurityGroup
+          SubnetId: !Ref MySubnet
+          PrivateIpAddress: "10.0.0.10" # optional, you can remove this line
+          DeleteOnTermination: true
+  MyEIPAssociation:
+    Type: AWS::EC2::EIPAssociation
+    Properties:
+      AllocationId: !GetAtt MyEIP.AllocationId
+      InstanceId: !Ref MyEC2Instance
+
+
+
