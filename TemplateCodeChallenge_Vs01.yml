@@ -1,28 +1,66 @@
+#CloudFormation using YAML
+
 AWSTemplateFormatVersion: '2010-09-09'
 Description: 'Create an EC2 instance with a public IP address and web server'
 Resources:
+  #Create VPC
   MyVpc:
     Type: 'AWS::EC2::VPC'
     Properties:
       CidrBlock: '10.0.0.0/16'
+      Tags:
+        - Key: Name
+          Value: my-vpc      
+  #Create Internet Gateway
   MyInternetGateway:
     Type: 'AWS::EC2::InternetGateway'
+    Properties:
+      Tags:
+        - Key: Name
+          Value: my-internet-gateway
+  #Attach  MyInternetGateway    
   MyVpcGatewayAttachment:
     Type: 'AWS::EC2::VPCGatewayAttachment'
     Properties:
       VpcId: !Ref MyVpc
       InternetGatewayId: !Ref MyInternetGateway
+  
+    #Create RouteTable
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref MyVpc
+      Tags:
+        - Key: Name
+          Value: my-public-route-table
+  
+  #Create Subnet
   MyPublicSubnet:
     Type: 'AWS::EC2::Subnet'
     Properties:
       VpcId: !Ref MyVpc
       CidrBlock: '10.0.0.0/24'
       MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: my-public-subnet
+
+  #Create Route in PublicRouteTable
+  PublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: MyVpcGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref MyInternetGateway
+
+  #Create SecurityGroup
   MySecurityGroup:
     Type: 'AWS::EC2::SecurityGroup'
     Properties:
+      GroupName: web-server-sg
+      GroupDescription: Security group for web server
       VpcId: !Ref MyVpc
-      GroupDescription: 'Allow HTTP and HTTPS traffic'
       SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: 80
@@ -32,7 +70,22 @@ Resources:
           FromPort: 443
           ToPort: 443
           CidrIp: '0.0.0.0/0'
-  MyInstance:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: '0.0.0.0/0'
+  
+  #Create KeyPair
+  MyKeyPair:
+    Type: AWS::EC2::KeyPair
+    Properties:
+      KeyName: 'MyKeyPair'
+      Tags:
+        - Key: Name
+          Value: 'MyKeyPair'
+  
+  #Create WebServerInstance
+  WebServerInstance:
     Type: 'AWS::EC2::Instance'
     Properties:
       ImageId: ami-0c94855ba95c71c99 # Amazon Linux 2 AMI (HVM), SSD Volume Type
@@ -41,33 +94,20 @@ Resources:
       SecurityGroupIds: [!Ref MySecurityGroup]
       SubnetId: !Ref MyPublicSubnet
       UserData: !Base64 |
-        #!/bin/bash
-        yum update -y
-        yum install -y httpd mod_ssl
-        systemctl start httpd.service
-        systemctl enable httpd.service
-        echo "<html><body><h1>Hello World</h1></body></html>" > /var/www/html/index.html
-        echo "<VirtualHost *:80>" > /etc/httpd/conf.d/http.conf
-        echo "  ServerName mywebserver" >> /etc/httpd/conf.d/http.conf
-        echo "  RewriteEngine On" >> /etc/httpd/conf.d/http.conf
-        echo "  RewriteRule ^(.*)$ https://%{HTTP_HOST}$1 [R=301,L]" >> /etc/httpd/conf.d/http.conf
-        echo "</VirtualHost>" >> /etc/httpd/conf.d/http.conf
-        echo "<VirtualHost *:443>" > /etc/httpd/conf.d/ssl.conf
-        echo "  ServerName mywebserver" >> /etc/httpd/conf.d/ssl.conf
-        echo "  DocumentRoot /var/www/html" >> /etc/httpd/conf.d/ssl.conf
-        echo "  SSLEngine on" >> /etc/httpd/conf.d/ssl.conf
-        echo "  SSLCertificateFile /etc/pki/tls/certs/server.crt" >> /etc/httpd/conf.d/ssl.conf
-        echo "  SSLCertificateKeyFile /etc/pki/tls/private/server.key
-              Tags:
+          #!/bin/bash
+          yum update -y
+          yum install -y httpd mod_ssl
+          echo "<html><head><title>Hello World</title></head><body><h1>Hello World!</h1></body></html>" > /var/www/html/index.html
+          systemctl start httpd
+          systemctl enable httpd
+          echo '# Redirect HTTP to HTTPS' > /etc/httpd/conf.d/redirect.conf
+          echo 'RewriteEngine On' >> /etc/httpd/conf.d/redirect.conf
+          echo 'RewriteCond %{HTTPS} off' >> /etc/httpd/conf.d/redirect.conf
+          echo 'RewriteRule (.*) https://%{HTTP_HOST}%{REQUEST_URI} [R,L]' >> /etc/httpd/conf.d/redirect.conf
+      Tags:
         - Key: Name
           Value: "My EC2 Instance"
-      NetworkInterfaces:
-        - AssociatePublicIpAddress: true
-          DeviceIndex: "0"
-          GroupSet:
-            - !Ref MySecurityGroup
-          SubnetId: !Ref MyPublicSubnet
-          DeleteOnTermination: true
+
 
 
 
