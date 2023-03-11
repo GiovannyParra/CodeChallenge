@@ -24,8 +24,7 @@ Resources:
     Properties:
       VpcId: !Ref MyVpc
       InternetGatewayId: !Ref MyInternetGateway
-  
-    #Create RouteTable
+  #Create RouteTable
   PublicRouteTable:
     Type: AWS::EC2::RouteTable
     Properties:
@@ -33,7 +32,6 @@ Resources:
       Tags:
         - Key: Name
           Value: my-public-route-table
-  
   #Create Subnet
   MyPublicSubnet:
     Type: 'AWS::EC2::Subnet'
@@ -44,7 +42,6 @@ Resources:
       Tags:
         - Key: Name
           Value: my-public-subnet
-
   #Create Route in PublicRouteTable
   PublicRoute:
     Type: AWS::EC2::Route
@@ -53,7 +50,12 @@ Resources:
       RouteTableId: !Ref PublicRouteTable
       DestinationCidrBlock: 0.0.0.0/0
       GatewayId: !Ref MyInternetGateway
-
+  #Create SubnetRouteTableAssociation
+  SubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref MyPublicSubnet
+      RouteTableId: !Ref PublicRouteTable
   #Create SecurityGroup
   MySecurityGroup:
     Type: 'AWS::EC2::SecurityGroup'
@@ -74,7 +76,6 @@ Resources:
           FromPort: 22
           ToPort: 22
           CidrIp: '0.0.0.0/0'
-  
   #Create KeyPair
   MyKeyPair:
     Type: AWS::EC2::KeyPair
@@ -83,7 +84,6 @@ Resources:
       Tags:
         - Key: Name
           Value: 'MyKeyPair'
-  
   #Create WebServerInstance
   WebServerInstance:
     Type: 'AWS::EC2::Instance'
